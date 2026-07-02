@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>베어마켓 조기경보 대시보드 v1.0</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0E1420;          /* 관제실 배경 */
+    --panel:#151F2E;       /* 카드 패널 */
+    --panel-deep:#101827;  /* 경보 패널 */
+    --line:#26344A;        /* 경계선 */
+    --ink:#E8EDF4;         /* 본문 텍스트 */
+    --muted:#8A99AD;       /* 보조 텍스트 */
+    --struct:#7DD3FC;      /* 구조/라벨 시안 */
+    --green:#2FBF71;
+    --amber:#F5A623;
+    --red:#E5484D;
+    --mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    line-height:1.55; padding-bottom:80px;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:0 20px;}
+
+  /* ── 헤더 ─────────────────────────── */
+  header{border-bottom:1px solid var(--line); padding:22px 0 18px;}
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em;
+    color:var(--struct); text-transform:uppercase; margin-bottom:6px;
+  }
+  h1{font-size:clamp(22px,3.4vw,30px); font-weight:800; letter-spacing:-0.02em;}
+  h1 .ver{font-family:var(--mono); font-size:12px; color:var(--muted); font-weight:500; margin-left:10px;}
+  .header-sub{color:var(--muted); font-size:13.5px; margin-top:6px;}
+  .header-row{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;}
+  .today{font-family:var(--mono); font-size:13px; color:var(--muted);}
+
+  /* ── 경보 램프 패널 (시그니처) ─────── */
+  .alert-board{
+    margin:26px 0; background:var(--panel-deep);
+    border:1px solid var(--line); border-radius:14px; padding:24px 26px 20px;
+    position:relative; overflow:hidden;
+  }
+  .alert-board::before{ /* 스캔라인 질감 */
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.012) 3px 4px);
+  }
+  .board-top{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:18px;}
+  .board-title{font-family:var(--mono); font-size:12px; letter-spacing:.2em; color:var(--struct);}
+  .lamps{display:grid; grid-template-columns:repeat(7,1fr); gap:12px;}
+  .lamp{
+    background:#0B111C; border:1px solid var(--line); border-radius:10px;
+    padding:14px 8px 12px; text-align:center; transition:border-color .3s;
+  }
+  .lamp .bulb{
+    width:26px; height:26px; border-radius:50%; margin:0 auto 10px;
+    background:#22304A; border:2px solid #2E3E5B; transition:all .35s;
+  }
+  .lamp.g .bulb{background:var(--green); border-color:var(--green); box-shadow:0 0 14px rgba(47,191,113,.55);}
+  .lamp.y .bulb{background:var(--amber); border-color:var(--amber); box-shadow:0 0 14px rgba(245,166,35,.55);}
+  .lamp.r .bulb{background:var(--red); border-color:var(--red); box-shadow:0 0 16px rgba(229,72,77,.65);}
+  @media (prefers-reduced-motion:no-preference){
+    .lamp.r .bulb{animation:pulse 1.6s ease-in-out infinite;}
+    @keyframes pulse{50%{box-shadow:0 0 26px rgba(229,72,77,.9);}}
+  }
+  .lamp .lamp-no{font-family:var(--mono); font-size:10px; color:var(--muted); display:block;}
+  .lamp .lamp-name{font-size:11.5px; font-weight:600; color:var(--ink); display:block; margin-top:2px; letter-spacing:-.01em;}
+  .verdict{
+    display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+    margin-top:20px; padding-top:18px; border-top:1px dashed var(--line);
+  }
+  .verdict-grade{font-size:clamp(20px,2.6vw,26px); font-weight:800; letter-spacing:-.01em;}
+  .verdict-grade.safe{color:var(--green);} .verdict-grade.watch{color:var(--amber);}
+  .verdict-grade.reduce{color:#FF8A5C;} .verdict-grade.defend{color:var(--red);}
+  .verdict-counts{font-family:var(--mono); font-size:13px; color:var(--muted);}
+  .verdict-counts b{color:var(--ink);}
+  .verdict-note{flex-basis:100%; font-size:13px; color:var(--muted);}
+  .verdict-note strong{color:var(--struct); font-weight:600;}
+
+  /* ── 섹션 타이틀 ──────────────────── */
+  .sec-title{
+    font-family:var(--mono); font-size:12px; letter-spacing:.2em; color:var(--struct);
+    margin:34px 0 14px; display:flex; align-items:center; gap:12px;
+  }
+  .sec-title::after{content:''; flex:1; height:1px; background:var(--line);}
+
+  /* ── 신호 카드 ────────────────────── */
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px;}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:18px 18px 16px; border-top:3px solid var(--line); transition:border-top-color .3s;
+  }
+  .card.g{border-top-color:var(--green);} .card.y{border-top-color:var(--amber);} .card.r{border-top-color:var(--red);}
+  .card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:4px;}
+  .card-no{font-family:var(--mono); font-size:11px; color:var(--muted);}
+  .card h3{font-size:15.5px; font-weight:700; margin-top:2px;}
+  .badge{
+    font-family:var(--mono); font-size:11px; font-weight:600; padding:3px 10px;
+    border-radius:99px; white-space:nowrap;
+  }
+  .badge.g{background:rgba(47,191,113,.14); color:var(--green);}
+  .badge.y{background:rgba(245,166,35,.14); color:var(--amber);}
+  .badge.r{background:rgba(229,72,77,.14); color:var(--red);}
+  .card-rule{font-size:12px; color:var(--muted); margin:8px 0 12px; line-height:1.6;}
+  .field{margin-bottom:10px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px;}
+  .field input, .field select{
+    width:100%; background:#0C1320; border:1px solid var(--line); border-radius:8px;
+    color:var(--ink); font-family:var(--mono); font-size:14px; padding:9px 11px; outline:none;
+  }
+  .field input:focus, .field select:focus{border-color:var(--struct);}
+  .src{font-size:12px; margin-top:6px;}
+  .src a{color:var(--struct); text-decoration:none;}
+  .src a:hover{text-decoration:underline;}
+
+  /* ── 보조지표 ─────────────────────── */
+  .aux-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px;}
+  .aux{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px;}
+  .aux h4{font-size:14px; font-weight:700; margin-bottom:2px;}
+  .aux .contra{font-family:var(--mono); font-size:10.5px; color:var(--amber); letter-spacing:.08em;}
+  .aux .hint{font-size:12px; color:var(--muted); margin:8px 0 10px; line-height:1.55;}
+
+  /* ── 저장/히스토리 ────────────────── */
+  .save-bar{
+    display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-top:14px;
+  }
+  .save-bar .field{margin:0; flex:1; min-width:150px;}
+  .btn{
+    background:var(--struct); color:#08243A; border:none; border-radius:8px;
+    font-weight:700; font-size:14px; padding:11px 22px; cursor:pointer; font-family:inherit;
+  }
+  .btn:hover{filter:brightness(1.1);}
+  .btn.ghost{background:transparent; border:1px solid var(--line); color:var(--muted); font-weight:500;}
+  .btn.ghost:hover{color:var(--ink); border-color:var(--muted); filter:none;}
+  .btn.danger{background:transparent; border:1px solid rgba(229,72,77,.4); color:var(--red); padding:6px 12px; font-size:12px; font-weight:500;}
+  table{width:100%; border-collapse:collapse; font-size:13px; margin-top:10px;}
+  th{font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--muted); text-align:left; padding:10px 10px; border-bottom:1px solid var(--line); white-space:nowrap;}
+  td{padding:11px 10px; border-bottom:1px solid rgba(38,52,74,.5); vertical-align:middle;}
+  .dots{display:flex; gap:5px;}
+  .dot{width:11px; height:11px; border-radius:50%; background:#22304A;}
+  .dot.g{background:var(--green);} .dot.y{background:var(--amber);} .dot.r{background:var(--red);}
+  .grade-chip{font-weight:700; font-size:12.5px;}
+  .table-scroll{overflow-x:auto;}
+  .empty{color:var(--muted); font-size:13px; padding:22px 0; text-align:center;}
+
+  /* ── 배너/설정 ────────────────────── */
+  .banner{
+    background:rgba(245,166,35,.08); border:1px solid rgba(245,166,35,.35);
+    border-radius:10px; padding:12px 16px; font-size:13px; color:var(--amber); margin:18px 0 0;
+  }
+  details.setup{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:14px 18px; margin-top:14px; font-size:13px; color:var(--muted);
+  }
+  details.setup summary{cursor:pointer; color:var(--struct); font-weight:600; font-size:13.5px;}
+  details.setup pre{
+    background:#0B111C; border:1px solid var(--line); border-radius:8px;
+    padding:14px; margin:12px 0; overflow-x:auto; font-family:var(--mono); font-size:12px; color:#B9C6D8; line-height:1.7;
+  }
+  details.setup ol{padding-left:20px; margin-top:8px;}
+  details.setup li{margin-bottom:6px;}
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
+    background:#1C2B40; border:1px solid var(--struct); color:var(--ink);
+    padding:12px 22px; border-radius:10px; font-size:14px; opacity:0; transition:all .3s; z-index:99;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0); opacity:1;}
+  @media (max-width:760px){
+    .lamps{grid-template-columns:repeat(4,1fr);}
+    .lamps .lamp:nth-child(n+5){grid-column:span 1;}
+  }
+  @media (max-width:480px){ .lamps{grid-template-columns:repeat(2,1fr);} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-row">
+    <div>
+      <div class="eyebrow">BEAR MARKET EARLY WARNING SYSTEM</div>
+      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.0</span></h1>
+      <div class="header-sub">7개 신호 월 1회 점검 · 조정장은 매수 기회, 베어마켓만 경계한다</div>
+    </div>
+    <div class="today" id="todayLabel"></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="banner" id="sbBanner" style="display:none;">
+    ⚙ Supabase가 아직 설정되지 않았습니다. 판정 기능은 정상 작동하며, 저장·히스토리만 비활성 상태입니다. 아래 "초기 설정 가이드"를 열어 URL과 키를 입력하세요.
+  </div>
+
+  <!-- ═══ 경보 램프 패널 ═══ -->
+  <div class="alert-board">
+    <div class="board-top">
+      <div class="board-title">EARLY WARNING PANEL — 7 SIGNALS</div>
+      <div class="verdict-counts" id="countLabel">🟢 0 · 🟡 0 · 🔴 0</div>
+    </div>
+    <div class="lamps" id="lamps"></div>
+    <div class="verdict">
+      <div class="verdict-grade safe" id="gradeLabel">—</div>
+      <div class="verdict-note" id="gradeNote">지표를 입력하면 종합 판정이 표시됩니다.</div>
+    </div>
+  </div>
+
+  <!-- ═══ 7개 신호 카드 ═══ -->
+  <div class="sec-title">SIGNALS — 신호별 점검</div>
+  <div class="grid" id="cardGrid"></div>
+
+  <!-- ═══ 보조지표 ═══ -->
+  <div class="sec-title">SENTIMENT — 보조지표 (역발상 해석)</div>
+  <div class="aux-grid">
+    <div class="aux">
+      <h4>VIX 변동성 지수</h4>
+      <div class="hint">20 미만 안정 · 30 이상 공포 급등 (급등 시 역발상 매수 관점)</div>
+      <div class="field"><input type="number" step="0.01" id="aux_vix" placeholder="예: 17.66" oninput="recalc()"></div>
+      <div class="src">출처: <a href="https://www.google.com/finance/quote/VIX:INDEXCBOE" target="_blank">Google Finance VIX</a></div>
+    </div>
+    <div class="aux">
+      <h4>Fear &amp; Greed 지수 <span class="contra">CONTRARIAN</span></h4>
+      <div class="hint">25 이하 극단적 공포 = 주식 개수 늘릴 시기 · 75 이상 극단적 탐욕 = 경계</div>
+      <div class="field"><input type="number" step="1" id="aux_fng" placeholder="예: 27" oninput="recalc()"></div>
+      <div class="src">출처: <a href="https://edition.cnn.com/markets/fear-and-greed" target="_blank">CNN Fear &amp; Greed</a></div>
+    </div>
+    <div class="aux">
+      <h4>AAII 강세론자 비율 (%) <span class="contra">CONTRARIAN</span></h4>
+      <div class="hint">역사 평균 37.5% · 49% 이상 과열 → 현금 비중 확대 검토 (2026년 1월 중순 49.5% 후 하락 사례)</div>
+      <div class="field"><input type="number" step="0.1" id="aux_aaii" placeholder="예: 44.9" oninput="recalc()"></div>
+      <div class="src">출처: <a href="https://www.aaii.com/sentimentsurvey" target="_blank">AAII Sentiment Survey</a> (매주 목요일)</div>
+    </div>
+  </div>
+
+  <!-- ═══ 점검 저장 ═══ -->
+  <div class="sec-title">SAVE — 점검 기록 저장</div>
+  <div class="save-bar">
+    <div class="field">
+      <label>점검일</label>
+      <input type="date" id="checkDate">
+    </div>
+    <div class="field" style="flex:2;">
+      <label>메모 (선택)</label>
+      <input type="text" id="checkMemo" placeholder="예: 테크주 조정 후 반등, 시장 폭 건강">
+    </div>
+    <button class="btn" onclick="saveCheck()">이번 점검 저장</button>
+  </div>
+
+  <!-- ═══ 히스토리 ═══ -->
+  <div class="sec-title">HISTORY — 점검 히스토리</div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>점검일</th><th>신호 (1–7)</th><th>🔴</th><th>🟡</th><th>종합 판정</th><th>메모</th><th></th></tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr><td colspan="7" class="empty">저장된 점검 기록이 없습니다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═══ 초기 설정 가이드 ═══ -->
+  <details class="setup">
+    <summary>⚙ 초기 설정 가이드 (Supabase 연결 · 최초 1회)</summary>
+    <ol>
+      <li>이 HTML 파일을 텍스트 에디터로 열고, 아래쪽 <b>&lt;script&gt;</b> 최상단의 <b>SUPABASE_URL</b>과 <b>SUPABASE_ANON_KEY</b>에 본인 프로젝트 값을 입력하세요. (Supabase 대시보드 → Settings → API)</li>
+      <li>Supabase 대시보드 → <b>SQL Editor</b>에서 아래 SQL을 실행해 테이블을 만드세요.</li>
+    </ol>
+    <pre>create table bear_market_checks (
+  id uuid primary key default gen_random_uuid(),
+  check_date date not null,
+  data jsonb not null,
+  red_count int not null default 0,
+  yellow_count int not null default 0,
+  green_count int not null default 0,
+  grade text,
+  memo text,
+  created_at timestamptz default now()
+);
+
+alter table bear_market_checks enable row level security;
+
+create policy "anon full access"
+  on bear_market_checks for all
+  using (true) with check (true);</pre>
+    <div>완료 후 파일을 저장하고 새로고침하면 저장·히스토리 기능이 활성화됩니다. (friending-tasks와 동일한 방식으로 GitHub → Netlify 배포 가능)</div>
+  </details>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════
+   ① Supabase 설정 — 본인 값으로 교체하세요
+   ══════════════════════════════════════════════ */
+const SUPABASE_URL = "https://vpkkawfrtxsqadjpszfk.supabase.co";       // 예: "https://xxxx.supabase.co"
+const SUPABASE_ANON_KEY = "sb_publishable_fg4aV0duiUkxDEYzIrqX4g__eu03dbK";  // 예: "eyJhbGciOi..."
+
+let sb = null;
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  document.getElementById('sbBanner').style.display = 'block';
+}
+
+/* ══════════════════════════════════════════════
+   ② 7개 신호 정의 (임계값 = 미주은 강의 기준)
+   judge()는 'g' | 'y' | 'r' | null(미입력) 반환
+   ══════════════════════════════════════════════ */
+const SIGNALS = [
+  {
+    id:'yield', no:'01', short:'금리역전', name:'장단기 금리차 (10Y−2Y)',
+    rule:'🟢 +0.2%p 이상 · 🟡 0~0.2%p (역전 접근) · 🔴 역전(0 미만). 1978년 이후 모든 침체에 선행.',
+    fields:[{key:'spread', label:'10년물 − 2년물 금리차 (%p)', type:'number', step:'0.01', ph:'예: 0.28'}],
+    src:[['FRED T10Y2Y','https://fred.stlouisfed.org/series/T10Y2Y']],
+    judge:v=>{ const x=num(v.spread); if(x===null) return null;
+      return x<0 ? 'r' : x<0.2 ? 'y' : 'g'; }
+  },
+  {
+    id:'breadth', no:'02', short:'시장 폭', name:'시장 내부 균열 (Market Breadth)',
+    rule:'S&P500 중 200일 이평선 위 종목 비율. 🟢 50% 이상 · 🟡 40~50% 모멘텀 붕괴 · 🔴 40% 미만.',
+    fields:[{key:'above200', label:'200일선 위 종목 비율 (%)', type:'number', step:'0.1', ph:'예: 61.75'}],
+    src:[['Barchart Breadth','https://www.barchart.com/stocks/momentum']],
+    judge:v=>{ const x=num(v.above200); if(x===null) return null;
+      return x<40 ? 'r' : x<50 ? 'y' : 'g'; }
+  },
+  {
+    id:'credit', no:'03', short:'신용S', name:'신용 스프레드 (하이일드−우량)',
+    rule:'🟢 2~4% 정상 · 🟡 5~6% 둔화 신호 · 🔴 7% 이상 위험 구간.',
+    fields:[{key:'spread', label:'하이일드 스프레드 (%)', type:'number', step:'0.01', ph:'예: 2.83'}],
+    src:[['FRED 하이일드 스프레드','https://fred.stlouisfed.org/series/BAMLH0A0HYM2']],
+    judge:v=>{ const x=num(v.spread); if(x===null) return null;
+      return x>=7 ? 'r' : x>=5 ? 'y' : 'g'; }
+  },
+  {
+    id:'fed', no:'04', short:'연준', name:'연준 사이클',
+    rule:'경기악화형 금리 인하가 가장 위험. 연속 인상으로 금리 절댓값이 5%+로 급등해도 경계.',
+    fields:[{key:'cycle', label:'현재 연준 국면', type:'select', options:[
+      ['g','선제적 인하 · 동결 (경기 양호)'],
+      ['y','연속 인상 → 금리 절댓값 급등 (5%+ 접근)'],
+      ['r','경기 악화형 금리 인하'],
+    ]}],
+    src:[['CME FedWatch','https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html']],
+    judge:v=> v.cycle || null
+  },
+  {
+    id:'valuation', no:'05', short:'밸류', name:'밸류에이션 과열 (Shiller PER + 어닝)',
+    rule:'PER이 높은 것 자체는 신호 아님. 🔴 = 고점 후 하락 반전 + 어닝 리비전 지수 마이너스 동시 발생 (2021.11 → 2022 베어마켓 사례).',
+    fields:[
+      {key:'perTrend', label:'Shiller PER 추세', type:'select', options:[
+        ['up','고점 갱신 · 상승 지속'],['down','고점 찍고 하락 반전'],
+      ]},
+      {key:'eri', label:'어닝 리비전 지수 (Citi ERI)', type:'number', step:'0.1', ph:'예: 0.3'},
+    ],
+    src:[['Shiller PER','https://www.multpl.com/shiller-pe'],['Yardeni ERI','https://yardeni.com']],
+    judge:v=>{ if(!v.perTrend) return null; const e=num(v.eri);
+      if(v.perTrend==='up') return 'g';
+      if(e!==null && e<0) return 'r';
+      return 'y'; }
+  },
+  {
+    id:'leading', no:'06', short:'선행지표', name:'선행 경기지수 (LEI + Sahm Rule)',
+    rule:'🔴 LEI 6개월 연속 하락 또는 Sahm ≥ 0.5 · 🟡 LEI 3~5개월 하락 또는 Sahm ≥ 0.3.',
+    fields:[
+      {key:'leiMonths', label:'LEI 연속 하락 개월 수 (상승 중이면 0)', type:'number', step:'1', ph:'예: 0'},
+      {key:'sahm', label:'Sahm Rule 수치', type:'number', step:'0.01', ph:'예: 0.1'},
+    ],
+    src:[['Conference Board LEI','https://www.conference-board.org/topics/us-leading-indicators'],['FRED Sahm','https://fred.stlouisfed.org/series/SAHMREALTIME']],
+    judge:v=>{ const m=num(v.leiMonths), s=num(v.sahm);
+      if(m===null && s===null) return null;
+      if((m!==null&&m>=6)||(s!==null&&s>=0.5)) return 'r';
+      if((m!==null&&m>=3)||(s!==null&&s>=0.3)) return 'y';
+      return 'g'; }
+  },
+  {
+    id:'momentum', no:'07', short:'모멘텀', name:'모멘텀 내부 신호 (섹터 로테이션)',
+    rule:'테크·성장주 리더십 = 건강 · 방어주(헬스케어·필수소비재) 강세 = 경기 우려 · 현금·국채 쏠림 = 즉시 이탈 신호. 주도주인 반도체 1개월 수익률 마이너스 전환 시 위험.',
+    fields:[
+      {key:'leader', label:'현재 섹터 리더십', type:'select', options:[
+        ['tech','테크 · 성장주 주도 (건강)'],
+        ['defensive','방어주 강세 (경기 우려)'],
+        ['cash','현금 · 국채로 자금 쏠림'],
+      ]},
+      {key:'semi1m', label:'반도체 1개월 수익률 (%)', type:'number', step:'0.1', ph:'예: 5.2'},
+    ],
+    src:[['Finviz S&P500 Map','https://finviz.com/map.ashx?t=sec']],
+    judge:v=>{ const s=num(v.semi1m);
+      if(!v.leader && s===null) return null;
+      if(v.leader==='cash') return 'r';
+      if(v.leader==='defensive' && s!==null && s<0) return 'r';
+      if(v.leader==='defensive' || (s!==null && s<0)) return 'y';
+      return 'g'; }
+  },
+];
+
+const GRADES = [
+  {max:1, cls:'safe',   name:'정상 보유',
+   note:'베어마켓 신호 없음. 이 구간의 하락은 <strong>조정장 = 매수 기회</strong>입니다. 조정은 평균 4개월 내 V자 회복하므로 버티거나 추가 매수하세요.'},
+  {max:3, cls:'watch',  name:'현금 비중 점진 확대',
+   note:'복수의 위험 신호 감지. 신규 매수를 늦추고 과열 종목부터 이익 실현을 검토하세요.'},
+  {max:7, cls:'defend', name:'방어 모드',
+   note:'펀더멘탈 훼손 가능성 높음. 베어마켓은 −20~40%, 회복까지 1년 이상 걸릴 수 있습니다. 현금·방어 자산 비중을 크게 높이세요.'},
+];
+
+/* ══════════════════════════════════════════════
+   ③ 렌더링
+   ══════════════════════════════════════════════ */
+function num(x){ return (x===undefined||x===null||x==='') ? null : parseFloat(x); }
+const $ = id => document.getElementById(id);
+
+function buildUI(){
+  // 램프
+  $('lamps').innerHTML = SIGNALS.map(s=>`
+    <div class="lamp" id="lamp_${s.id}">
+      <div class="bulb"></div>
+      <span class="lamp-no">${s.no}</span>
+      <span class="lamp-name">${s.short}</span>
+    </div>`).join('');
+
+  // 카드
+  $('cardGrid').innerHTML = SIGNALS.map(s=>`
+    <div class="card" id="card_${s.id}">
+      <div class="card-head">
+        <div><span class="card-no">SIGNAL ${s.no}</span><h3>${s.name}</h3></div>
+        <span class="badge" id="badge_${s.id}">미입력</span>
+      </div>
+      <div class="card-rule">${s.rule}</div>
+      ${s.fields.map(f=> f.type==='select' ? `
+        <div class="field">
+          <label>${f.label}</label>
+          <select id="in_${s.id}_${f.key}" onchange="recalc()">
+            <option value="">— 선택 —</option>
+            ${f.options.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}
+          </select>
+        </div>` : `
+        <div class="field">
+          <label>${f.label}</label>
+          <input type="number" step="${f.step}" id="in_${s.id}_${f.key}" placeholder="${f.ph}" oninput="recalc()">
+        </div>`).join('')}
+      <div class="src">확인: ${s.src.map(a=>`<a href="${a[1]}" target="_blank">${a[0]}</a>`).join(' · ')}</div>
+    </div>`).join('');
+}
+
+function readInputs(){
+  const data = {aux:{ vix:num($('aux_vix').value), fng:num($('aux_fng').value), aaii:num($('aux_aaii').value) }};
+  SIGNALS.forEach(s=>{
+    data[s.id] = {};
+    s.fields.forEach(f=>{ data[s.id][f.key] = $(`in_${s.id}_${f.key}`).value; });
+  });
+  return data;
+}
+
+function judgeAll(data){
+  return SIGNALS.map(s=> s.judge(data[s.id]||{}));
+}
+
+function recalc(){
+  const data = readInputs();
+  const results = judgeAll(data);
+  const label = {g:'정상', y:'주의', r:'위험'};
+  let g=0,y=0,r=0;
+
+  SIGNALS.forEach((s,i)=>{
+    const res = results[i];
+    const lamp = $(`lamp_${s.id}`), card = $(`card_${s.id}`), badge = $(`badge_${s.id}`);
+    lamp.className = 'lamp' + (res?' '+res:'');
+    card.className = 'card' + (res?' '+res:'');
+    badge.className = 'badge' + (res?' '+res:'');
+    badge.textContent = res ? label[res] : '미입력';
+    if(res==='g')g++; if(res==='y')y++; if(res==='r')r++;
+  });
+
+  $('countLabel').innerHTML = `🟢 <b>${g}</b> · 🟡 <b>${y}</b> · 🔴 <b>${r}</b>`;
+
+  const entered = g+y+r;
+  if(entered===0){
+    $('gradeLabel').textContent='—'; $('gradeLabel').className='verdict-grade safe';
+    $('gradeNote').textContent='지표를 입력하면 종합 판정이 표시됩니다.';
+    return {g,y,r,grade:null};
+  }
+  // 주의 2개 = 위험 1개로 환산하여 보수적으로 반영
+  const score = r + Math.floor(y/2);
+  const grade = GRADES.find(x=> score<=x.max) || GRADES[GRADES.length-1];
+  // 2~3 구간 세분화: 위험 2~3개면 reduce 색상
+  $('gradeLabel').textContent = grade.name;
+  $('gradeLabel').className = 'verdict-grade ' + grade.cls;
+  $('gradeNote').innerHTML = grade.note + (entered<7 ? ` <em style="color:var(--muted)">(입력 ${entered}/7 — 전체 입력 시 판정이 더 정확해집니다)</em>` : '');
+  return {g,y,r,grade:grade.name};
+}
+
+/* ══════════════════════════════════════════════
+   ④ Supabase 저장 · 히스토리
+   ══════════════════════════════════════════════ */
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+async function saveCheck(){
+  if(!sb){ toast('Supabase 미설정 — 초기 설정 가이드를 확인하세요'); return; }
+  const data = readInputs();
+  const {g,y,r,grade} = recalc();
+  if(g+y+r===0){ toast('최소 1개 이상 신호를 입력해 주세요'); return; }
+  data._results = judgeAll(data); // 판정 스냅샷도 함께 저장
+
+  const {error} = await sb.from('bear_market_checks').insert({
+    check_date: $('checkDate').value || new Date().toISOString().slice(0,10),
+    data, red_count:r, yellow_count:y, green_count:g,
+    grade, memo: $('checkMemo').value || null,
+  });
+  if(error){ toast('저장 실패: ' + error.message); return; }
+  toast('점검 기록이 저장되었습니다 ✓');
+  $('checkMemo').value='';
+  loadHistory();
+}
+
+async function loadHistory(){
+  if(!sb) return;
+  const {data:rows, error} = await sb.from('bear_market_checks')
+    .select('*').order('check_date',{ascending:false}).limit(36);
+  if(error){ $('historyBody').innerHTML = `<tr><td colspan="7" class="empty">불러오기 실패: ${error.message}</td></tr>`; return; }
+  if(!rows || rows.length===0){
+    $('historyBody').innerHTML = `<tr><td colspan="7" class="empty">저장된 점검 기록이 없습니다.</td></tr>`; return;
+  }
+  const gradeColor = {'정상 보유':'var(--green)','현금 비중 점진 확대':'var(--amber)','방어 모드':'var(--red)'};
+  $('historyBody').innerHTML = rows.map(row=>{
+    const res = (row.data && row.data._results) || [];
+    const dots = SIGNALS.map((s,i)=>`<span class="dot ${res[i]||''}" title="${s.no} ${s.short}"></span>`).join('');
+    return `<tr>
+      <td style="font-family:var(--mono); white-space:nowrap;">${row.check_date}</td>
+      <td><div class="dots">${dots}</div></td>
+      <td style="font-family:var(--mono); color:var(--red);">${row.red_count}</td>
+      <td style="font-family:var(--mono); color:var(--amber);">${row.yellow_count}</td>
+      <td><span class="grade-chip" style="color:${gradeColor[row.grade]||'var(--ink)'}">${row.grade||'—'}</span></td>
+      <td style="color:var(--muted); max-width:220px;">${row.memo?escapeHtml(row.memo):''}</td>
+      <td><button class="btn danger" onclick="deleteCheck('${row.id}')">삭제</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteCheck(id){
+  if(!confirm('이 점검 기록을 삭제할까요?')) return;
+  const {error} = await sb.from('bear_market_checks').delete().eq('id', id);
+  if(error){ toast('삭제 실패: ' + error.message); return; }
+  toast('삭제되었습니다');
+  loadHistory();
+}
+
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ══════════════════════════════════════════════
+   ⑤ 초기화
+   ══════════════════════════════════════════════ */
+buildUI();
+const now = new Date();
+$('checkDate').value = now.toISOString().slice(0,10);
+$('todayLabel').textContent = now.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+recalc();
+loadHistory();
+</script>
+</body>
+</html>
