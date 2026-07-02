@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>베어마켓 조기경보 대시보드 v1.0</title>
+<title>베어마켓 조기경보 대시보드 v1.1</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -186,7 +186,7 @@
   <div class="wrap header-row">
     <div>
       <div class="eyebrow">BEAR MARKET EARLY WARNING SYSTEM</div>
-      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.0</span></h1>
+      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.1</span></h1>
       <div class="header-sub">7개 신호 월 1회 점검 · 조정장은 매수 기회, 베어마켓만 경계한다</div>
     </div>
     <div class="today" id="todayLabel"></div>
@@ -197,6 +197,15 @@
 
   <div class="banner" id="sbBanner" style="display:none;">
     ⚙ Supabase가 아직 설정되지 않았습니다. 판정 기능은 정상 작동하며, 저장·히스토리만 비활성 상태입니다. 아래 "초기 설정 가이드"를 열어 URL과 키를 입력하세요.
+  </div>
+
+  <!-- ═══ 자동 조회 ═══ -->
+  <div class="save-bar" style="margin-top:18px; align-items:center; justify-content:space-between;">
+    <div style="flex:1; min-width:240px;">
+      <div style="font-weight:700; font-size:14.5px;">📡 최신 데이터 자동 조회</div>
+      <div style="font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.55;" id="fetchStatus">금리차 · 신용 스프레드 · Sahm Rule · VIX · Fear&amp;Greed 5개 지표를 한 번에 가져옵니다. (Netlify 배포 주소에서만 작동)</div>
+    </div>
+    <button class="btn" id="fetchBtn" onclick="autoFetch()">자동 조회</button>
   </div>
 
   <!-- ═══ 경보 램프 패널 ═══ -->
@@ -494,6 +503,37 @@ function recalc(){
   $('gradeLabel').className = 'verdict-grade ' + grade.cls;
   $('gradeNote').innerHTML = grade.note + (entered<7 ? ` <em style="color:var(--muted)">(입력 ${entered}/7 — 전체 입력 시 판정이 더 정확해집니다)</em>` : '');
   return {g,y,r,grade:grade.name};
+}
+
+/* ══════════════════════════════════════════════
+   ③-1 최신 데이터 자동 조회 (Netlify Functions 경유)
+   ══════════════════════════════════════════════ */
+async function autoFetch(){
+  const btn = $('fetchBtn'), st = $('fetchStatus');
+  btn.disabled = true; btn.textContent = '조회 중...';
+  st.textContent = 'FRED · CNN에서 데이터를 가져오는 중입니다...';
+  try{
+    const res = await fetch('/.netlify/functions/market-data');
+    if(!res.ok){
+      const errBody = await res.json().catch(()=>({}));
+      throw new Error(errBody.error || ('서버 응답 오류 ' + res.status));
+    }
+    const d = await res.json();
+    const set = (id, v) => { if(v !== null && v !== undefined && !isNaN(v)) $(id).value = v; };
+    set('in_yield_spread',   d.t10y2y);    // 신호 01 금리차
+    set('in_credit_spread',  d.hySpread);  // 신호 03 신용 스프레드
+    set('in_leading_sahm',   d.sahm);      // 신호 06 Sahm Rule
+    set('aux_vix', d.vix);
+    set('aux_fng', d.fearGreed);
+    recalc();
+    const extra = (d.fedFunds !== null && d.fedFunds !== undefined) ? ` 참고: 연준 기준금리 ${d.fedFunds}%.` : '';
+    st.textContent = `✓ ${d.asOf || '최신'} 기준 5개 지표 자동 입력 완료.${extra} 나머지 신호(02 시장폭 · 04 연준국면 · 05 밸류 · 06 LEI · 07 모멘텀)는 링크로 확인 후 입력하세요.`;
+    toast('최신 데이터를 가져왔습니다 ✓');
+  }catch(e){
+    st.textContent = '조회 실패: ' + e.message + ' — Netlify 배포 주소(xxx.netlify.app)에서 열었는지, Netlify에 FRED_API_KEY 환경변수를 등록했는지 확인하세요.';
+    toast('자동 조회 실패');
+  }
+  btn.disabled = false; btn.textContent = '자동 조회';
 }
 
 /* ══════════════════════════════════════════════
