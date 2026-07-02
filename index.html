@@ -369,7 +369,7 @@ const SIGNALS = [
       ]},
       {key:'eri', label:'어닝 리비전 지수 (Citi ERI)', type:'number', step:'0.1', ph:'예: 0.3'},
     ],
-    src:[['Shiller PER','https://www.multpl.com/shiller-pe'],['Yardeni ERI','https://yardeni.com']],
+    src:[['Shiller PER','https://www.multpl.com/shiller-pe'],['Yardeni 어닝 글','https://www.yardeniquicktakes.com/tag/s-p-500-earnings/']],
     judge:v=>{ if(!v.perTrend) return null; const e=num(v.eri);
       if(v.perTrend==='up') return 'g';
       if(e!==null && e<0) return 'r';
