@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>베어마켓 조기경보 대시보드 v1.1</title>
+<title>베어마켓 조기경보 대시보드 v1.2</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -29,6 +29,25 @@
     line-height:1.55; padding-bottom:80px;
   }
   .wrap{max-width:1180px; margin:0 auto; padding:0 20px;}
+
+  /* ── 사이드바 레이아웃 (v1.2) ─────── */
+  .app-shell{max-width:1180px; margin:0 auto; padding:22px 20px 0; display:flex; gap:26px; align-items:flex-start;}
+  .sidebar{position:sticky; top:22px; flex:0 0 188px; display:flex; flex-direction:column; gap:6px;}
+  .nav-brand{font-family:var(--mono); font-size:10px; letter-spacing:.22em; color:var(--muted); padding:4px 12px 8px;}
+  .nav-item{
+    display:block; width:100%; text-align:left; background:transparent; border:1px solid transparent;
+    border-radius:10px; color:var(--muted); font-family:inherit; font-size:14px; font-weight:600;
+    padding:11px 14px; cursor:pointer; letter-spacing:-.01em; transition:all .18s;
+  }
+  .nav-item:hover{color:var(--ink); background:var(--panel);}
+  .nav-item.active{color:var(--struct); background:var(--panel); border-color:var(--line);}
+  .main-col{flex:1; min-width:0;}
+  @media (max-width:820px){
+    .app-shell{flex-direction:column; gap:14px; padding-top:16px;}
+    .sidebar{position:static; flex:none; flex-direction:row; gap:8px; overflow-x:auto; padding-bottom:4px;}
+    .nav-brand{display:none;}
+    .nav-item{white-space:nowrap; padding:9px 14px;}
+  }
 
   /* ── 헤더 ─────────────────────────── */
   header{border-bottom:1px solid var(--line); padding:22px 0 18px;}
@@ -83,6 +102,29 @@
   .verdict-counts b{color:var(--ink);}
   .verdict-note{flex-basis:100%; font-size:13px; color:var(--muted);}
   .verdict-note strong{color:var(--struct); font-weight:600;}
+
+  /* ── 막스 진자 (사이클 나침반) ────── */
+  .pendulum{margin:26px 0; background:var(--panel-deep); border:1px solid var(--line);
+    border-radius:14px; padding:24px 26px 20px;}
+  .pend-title{font-family:var(--mono); font-size:12px; letter-spacing:.2em; color:var(--struct); margin-bottom:18px;}
+  .pend-band{position:relative; height:52px; display:flex; border-radius:10px; overflow:hidden; border:1px solid var(--line);}
+  .pend-band .pz{flex:1;}
+  /* 발산 스케일: 시안(기회) → 뉴트럴 → 레드(거품). green은 베어패널 전용이라 미사용 */
+  .pz1{background:#1E5C6E;} .pz2{background:#2E6E7E;} .pz3{background:#3A4658;} .pz4{background:#8A5A2E;} .pz5{background:#8E3438;}
+  .pend-mark{position:absolute; top:-8px; bottom:-8px; width:3px; background:var(--ink); border-radius:2px; transition:left .4s ease;}
+  .pend-pin{position:absolute; top:-34px; transform:translateX(-50%); background:var(--ink); color:var(--bg);
+    font-family:var(--mono); font-size:12px; font-weight:600; padding:3px 9px; border-radius:8px; white-space:nowrap; transition:left .4s ease;}
+  .pend-scale{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:8px;}
+  .pend-dims{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:20px;}
+  .pdim{background:#0B111C; border:1px solid var(--line); border-radius:10px; padding:12px 14px;}
+  .pdim .pd-name{font-size:11.5px; color:var(--muted);}
+  .pdim .pd-val{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:4px;}
+  .pdim .pd-bar{height:5px; background:#22304A; border-radius:3px; margin-top:8px; overflow:hidden;}
+  .pdim .pd-fill{height:100%; background:var(--struct); transition:width .4s ease;}
+  .pend-posture.atk2,.pend-posture.atk1{color:var(--struct);}
+  .pend-posture.neu{color:var(--ink);}
+  .pend-posture.def1{color:var(--amber);} .pend-posture.def2{color:var(--red);}
+  @media (max-width:600px){ .pend-dims{grid-template-columns:repeat(2,1fr);} }
 
   /* ── 섹션 타이틀 ──────────────────── */
   .sec-title{
@@ -186,18 +228,52 @@
   <div class="wrap header-row">
     <div>
       <div class="eyebrow">BEAR MARKET EARLY WARNING SYSTEM</div>
-      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.1</span></h1>
-      <div class="header-sub">7개 신호 월 1회 점검 · 조정장은 매수 기회, 베어마켓만 경계한다</div>
+      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.2</span></h1>
+      <div class="header-sub">7개 신호 월 1회 점검 · 조정장은 매수 기회, 베어마켓만 경계한다 · 🧭 막스 진자 추가</div>
     </div>
     <div class="today" id="todayLabel"></div>
   </div>
 </header>
 
-<div class="wrap">
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="nav-brand">VIEW</div>
+    <button class="nav-item active" data-view="compass" onclick="showView('compass')">🧭 진자 나침반</button>
+    <button class="nav-item" data-view="bear" onclick="showView('bear')">🚨 조기경보</button>
+    <button class="nav-item" data-view="history" onclick="showView('history')">🕑 히스토리</button>
+  </nav>
+  <main class="main-col">
 
   <div class="banner" id="sbBanner" style="display:none;">
     ⚙ Supabase가 아직 설정되지 않았습니다. 판정 기능은 정상 작동하며, 저장·히스토리만 비활성 상태입니다. 아래 "초기 설정 가이드"를 열어 URL과 키를 입력하세요.
   </div>
+
+  <!-- ═══ 🧭 뷰: 진자 나침반 ═══ -->
+  <div class="view" id="view-compass">
+    <div class="pendulum">
+      <div class="pend-title">MARKET PENDULUM — 사이클 나침반</div>
+      <div class="pend-band">
+        <div class="pz pz1"></div><div class="pz pz2"></div><div class="pz pz3"></div>
+        <div class="pz pz4"></div><div class="pz pz5"></div>
+        <div class="pend-mark" id="pendMark" style="left:50%"></div>
+        <div class="pend-pin" id="pendPin" style="left:50%">— · —</div>
+      </div>
+      <div class="pend-scale">
+        <span>극공포·헐값</span><span>비관</span><span>중립</span><span>낙관</span><span>극탐욕·거품</span>
+      </div>
+      <div class="pend-dims" id="pendDims"></div>
+      <div class="verdict" style="margin-top:20px;">
+        <div class="verdict-grade pend-posture" id="pendPosture">—</div>
+        <div class="verdict-note" id="pendPostureNote">지표를 입력하면 진자 위치가 계산됩니다.</div>
+      </div>
+      <div class="banner" style="background:rgba(125,211,252,.06); border-color:rgba(125,211,252,.28); color:var(--struct); margin-top:20px;">
+        🧭 진자는 <b>🚨 조기경보</b> 탭의 입력값을 그대로 읽어 계산됩니다. 값을 채운 뒤 이 탭에서 공수 자세를 확인하세요. (예측이 아니라 온도계 — 단정적 매매 지시가 아닌 자세 권고)
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 🚨 뷰: 조기경보 ═══ -->
+  <div class="view" id="view-bear" style="display:none;">
 
   <!-- ═══ 자동 조회 ═══ -->
   <div class="save-bar" style="margin-top:18px; align-items:center; justify-content:space-between;">
@@ -262,15 +338,20 @@
     <button class="btn" onclick="saveCheck()">이번 점검 저장</button>
   </div>
 
+  </div><!-- /view-bear -->
+
+  <!-- ═══ 🕑 뷰: 히스토리 ═══ -->
+  <div class="view" id="view-history" style="display:none;">
+
   <!-- ═══ 히스토리 ═══ -->
   <div class="sec-title">HISTORY — 점검 히스토리</div>
   <div class="table-scroll">
     <table>
       <thead>
-        <tr><th>점검일</th><th>신호 (1–7)</th><th>🔴</th><th>🟡</th><th>종합 판정</th><th>메모</th><th></th></tr>
+        <tr><th>점검일</th><th>신호 (1–7)</th><th>🔴</th><th>🟡</th><th>종합 판정</th><th>🧭 진자</th><th>메모</th><th></th></tr>
       </thead>
       <tbody id="historyBody">
-        <tr><td colspan="7" class="empty">저장된 점검 기록이 없습니다.</td></tr>
+        <tr><td colspan="8" class="empty">저장된 점검 기록이 없습니다.</td></tr>
       </tbody>
     </table>
   </div>
@@ -291,6 +372,9 @@
   green_count int not null default 0,
   grade text,
   memo text,
+  pendulum_pos int,          -- 🧭 진자 위치 0~100
+  pendulum_posture text,     -- 🧭 자세명 (강한 공격 … 강한 수비)
+  pendulum_dims jsonb,       -- 🧭 4차원 스냅샷
   created_at timestamptz default now()
 );
 
@@ -299,10 +383,42 @@ alter table bear_market_checks enable row level security;
 create policy "anon full access"
   on bear_market_checks for all
   using (true) with check (true);</pre>
+    <div style="margin-top:10px;">이미 <b>bear_market_checks</b> 테이블이 있다면(기존 사용자), 위 create 대신 아래 3줄만 실행해 진자 컬럼을 추가하세요.</div>
+    <pre>alter table bear_market_checks add column if not exists pendulum_pos int;
+alter table bear_market_checks add column if not exists pendulum_posture text;
+alter table bear_market_checks add column if not exists pendulum_dims jsonb;</pre>
     <div>완료 후 파일을 저장하고 새로고침하면 저장·히스토리 기능이 활성화됩니다. (friending-tasks와 동일한 방식으로 GitHub → Netlify 배포 가능)</div>
   </details>
 
-</div>
+  <!-- ═══ 진자 버핏지수 자동조회 (Netlify 함수 확장) ═══ -->
+  <details class="setup">
+    <summary>🧭 진자 자동조회 확장 (Netlify market-data 함수에 버핏지수 추가 · 선택)</summary>
+    <div>진자의 <b>밸류에이션 차원</b>을 자동 채우려면, 배포된 <b>netlify/functions/market-data.js</b>의 응답에 버핏지수를 추가하세요. FRED의 윌셔5000(<b>WILL5000INDFC</b>)과 명목 GDP(<b>GDP</b>) 두 계열이면 되고, <b>기존 FRED_API_KEY를 그대로 재사용</b>합니다. 아래를 함수 안에 붙이고 반환 객체에 <b>buffett</b>을 추가하면 됩니다.</div>
+    <pre>// 기존 FRED 조회 헬퍼(fredLatest 등)를 재사용한다고 가정
+const KEY = process.env.FRED_API_KEY;
+async function fredLatest(series){
+  const url = `https://api.stlouisfed.org/fred/series/observations`
+    + `?series_id=${series}&api_key=${KEY}&file_type=json`
+    + `&sort_order=desc&limit=1`;
+  const r = await fetch(url); const j = await r.json();
+  const v = j?.observations?.[0]?.value;
+  return (v && v !== '.') ? parseFloat(v) : null;
+}
+
+// 버핏지수 = 윌셔5000 ÷ 명목GDP × 100
+const wilshire = await fredLatest('WILL5000INDFC');  // 지수 포인트 ≈ 시총($10억)
+const gdp      = await fredLatest('GDP');            // 명목 GDP($10억, 연율)
+const buffett  = (wilshire && gdp) ? Math.round(wilshire / gdp * 1000) / 10 : null;
+
+// 반환 객체에 추가: return { ...기존, buffett };
+// CAPE는 월 단위로 느리게 변하므로 신호 05 필드에 수동 입력해도 무방.</pre>
+    <div>추가 후 재배포하면 "자동 조회" 버튼이 버핏지수까지 가져와 진자 밸류에이션에 반영합니다. (함수를 안 고쳐도 진자·저장은 정상 작동 — 버핏 필드만 수동 입력이 됩니다.)</div>
+  </details>
+
+  </div><!-- /view-history -->
+
+  </main>
+</div><!-- /app-shell -->
 
 <div class="toast" id="toast"></div>
 
@@ -368,8 +484,10 @@ const SIGNALS = [
         ['up','고점 갱신 · 상승 지속'],['down','고점 찍고 하락 반전'],
       ]},
       {key:'eri', label:'어닝 리비전 지수 (Citi ERI)', type:'number', step:'0.1', ph:'예: 0.3'},
+      {key:'cape', label:'Shiller CAPE 수치 (🧭 진자 밸류에이션)', type:'number', step:'0.01', ph:'예: 38.5'},
+      {key:'buffett', label:'버핏지수 시총/GDP % (🧭 진자·자동조회)', type:'number', step:'0.1', ph:'예: 190'},
     ],
-    src:[['Shiller PER','https://www.multpl.com/shiller-pe'],['Yardeni 어닝 글','https://www.yardeniquicktakes.com/tag/s-p-500-earnings/']],
+    src:[['Shiller PER · CAPE','https://www.multpl.com/shiller-pe'],['Yardeni ERI','https://yardeni.com'],['버핏지수','https://www.longtermtrends.net/market-cap-to-gdp-the-buffett-indicator/']],
     judge:v=>{ if(!v.perTrend) return null; const e=num(v.eri);
       if(v.perTrend==='up') return 'g';
       if(e!==null && e<0) return 'r';
@@ -420,10 +538,71 @@ const GRADES = [
 ];
 
 /* ══════════════════════════════════════════════
+   ②-1 막스 진자 — 사이클 나침반 (기존 입력 재사용)
+   원칙: 모든 지표를 "탐욕=100 / 공포=0" 방향으로 통일 →
+   0~100 정규화 → 차원 평균 → 가중 종합.
+   ══════════════════════════════════════════════ */
+const clamp01 = x => Math.max(0, Math.min(100, x));
+const lerp = (v, lo, hi) => clamp01((v - lo) / (hi - lo) * 100);
+const avg = a => { const x = a.filter(v => v !== null); return x.length ? x.reduce((s, v) => s + v, 0) / x.length : null; };
+
+const NORM = {
+  fng:  v => v,                       // 이미 0~100 (탐욕 방향)
+  vix:  v => lerp(40 - v, 0, 30),     // 10→100(탐욕), 40→0(공포)
+  aaii: v => lerp(v, 20, 55),         // 강세론자 많을수록 탐욕
+  hy:   v => lerp(8 - v, 0, 5.5),     // 스프레드 좁을수록 탐욕: 2.5%→100, 8%→0
+  breadth: v => v,                    // 200일선 위 % 높을수록 후기/탐욕
+  cape: v => lerp(v, 15, 40),         // 앵커 15~40 (초기 고정, 후에 과거 백분위로 교체)
+  buffett: v => lerp(v, 80, 200),     // 시총/GDP %: 80→0, 200→100
+};
+
+function computePendulum(get) {              // get(id) → number|null
+  const fng = get('aux_fng'), vix = get('aux_vix'), aaii = get('aux_aaii');
+  const hy = get('in_credit_spread');
+  const br = get('in_breadth_above200'), yc = get('in_yield_spread');
+  const cape = get('in_valuation_cape'), buf = get('in_valuation_buffett');
+
+  const dims = {
+    sentiment: avg([fng !== null ? NORM.fng(fng) : null,
+                    vix !== null ? NORM.vix(vix) : null,
+                    aaii !== null ? NORM.aaii(aaii) : null]),
+    credit:    hy !== null ? NORM.hy(hy) : null,
+    trend:     avg([br !== null ? NORM.breadth(br) : null,
+                    yc !== null ? lerp(yc, -1, 2) : null]),   // 금리차 완만한 보조
+    valuation: avg([cape !== null ? NORM.cape(cape) : null,
+                    buf  !== null ? NORM.buffett(buf) : null]),
+  };
+
+  // 가중 종합 (막스가 중시하는 신용 사이클에 가중 ↑)
+  const W = { sentiment: 1.0, credit: 1.3, trend: 0.8, valuation: 1.1 };
+  let sum = 0, wsum = 0;
+  for (const k in dims) if (dims[k] !== null) { sum += dims[k] * W[k]; wsum += W[k]; }
+  const pos = wsum ? Math.round(sum / wsum) : null;
+  return { pos, dims };
+}
+
+const POSTURES = [
+  { max: 20, name: '강한 공격', cls: 'atk2', note: '극단적 공포. 위험은 싸다 — 우량 자산 적극 매수 구간.' },
+  { max: 40, name: '점진 공격', cls: 'atk1', note: '비관 우위. 분할 매수로 진입 확대.' },
+  { max: 60, name: '균형',      cls: 'neu',  note: '중립 구간. 현 포지션 유지, 신규 진입 신중.' },
+  { max: 80, name: '점진 수비', cls: 'def1', note: '낙관 우위. 비중 축소·현금 확대 시작.' },
+  { max: 100,name: '강한 수비', cls: 'def2', note: '극단적 탐욕. 자신감이 비싸다 — 적극 차익실현.' },
+];
+const postureOf = pos => POSTURES.find(p => pos <= p.max);
+
+/* ══════════════════════════════════════════════
    ③ 렌더링
    ══════════════════════════════════════════════ */
 function num(x){ return (x===undefined||x===null||x==='') ? null : parseFloat(x); }
 const $ = id => document.getElementById(id);
+
+/* 사이드바 뷰 전환 (v1.2) — 입력은 DOM에 그대로 유지되어 공유 상태 무손상 */
+function showView(name){
+  ['compass','bear','history'].forEach(v=>{
+    const el = $('view-'+v); if(el) el.style.display = (v===name) ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach(b=> b.classList.toggle('active', b.dataset.view===name));
+}
 
 function buildUI(){
   // 램프
@@ -493,6 +672,7 @@ function recalc(){
   if(entered===0){
     $('gradeLabel').textContent='—'; $('gradeLabel').className='verdict-grade safe';
     $('gradeNote').textContent='지표를 입력하면 종합 판정이 표시됩니다.';
+    renderPendulum();
     return {g,y,r,grade:null};
   }
   // 주의 2개 = 위험 1개로 환산하여 보수적으로 반영
@@ -502,7 +682,37 @@ function recalc(){
   $('gradeLabel').textContent = grade.name;
   $('gradeLabel').className = 'verdict-grade ' + grade.cls;
   $('gradeNote').innerHTML = grade.note + (entered<7 ? ` <em style="color:var(--muted)">(입력 ${entered}/7 — 전체 입력 시 판정이 더 정확해집니다)</em>` : '');
+  renderPendulum();
   return {g,y,r,grade:grade.name};
+}
+
+/* ══════════════════════════════════════════════
+   ③-0 막스 진자 렌더 (recalc() 끝에서 호출)
+   ══════════════════════════════════════════════ */
+function renderPendulum(){
+  // null-safe: in_valuation_cape/buffett 등 아직 없는 필드는 null 처리
+  const get = id => { const el = document.getElementById(id); return el ? num(el.value) : null; };
+  const { pos, dims } = computePendulum(get);
+  const mark = $('pendMark'), pin = $('pendPin');
+  const NAMES = { sentiment:'심리', credit:'신용·유동성', trend:'추세', valuation:'밸류에이션' };
+  $('pendDims').innerHTML = Object.keys(NAMES).map(k => {
+    const v = dims[k];
+    return `<div class="pdim"><div class="pd-name">${NAMES[k]}</div>
+      <div class="pd-val">${v === null ? '—' : Math.round(v)}</div>
+      <div class="pd-bar"><div class="pd-fill" style="width:${v === null ? 0 : Math.round(v)}%"></div></div></div>`;
+  }).join('');
+  if (pos === null){
+    pin.textContent = '— · —'; mark.style.left = '50%'; pin.style.left = '50%';
+    $('pendPosture').textContent = '—'; $('pendPosture').className = 'verdict-grade pend-posture';
+    $('pendPostureNote').textContent = '지표를 입력하면 진자 위치가 계산됩니다.';
+    return;
+  }
+  const zone = postureOf(pos);
+  mark.style.left = pos + '%'; pin.style.left = pos + '%';
+  pin.textContent = pos + ' · ' + zone.name;
+  $('pendPosture').textContent = zone.name;
+  $('pendPosture').className = 'verdict-grade pend-posture ' + zone.cls;
+  $('pendPostureNote').textContent = zone.note;
 }
 
 /* ══════════════════════════════════════════════
@@ -525,9 +735,12 @@ async function autoFetch(){
     set('in_leading_sahm',   d.sahm);      // 신호 06 Sahm Rule
     set('aux_vix', d.vix);
     set('aux_fng', d.fearGreed);
-    recalc();
+    set('in_valuation_buffett', d.buffett); // 🧭 진자 밸류에이션 (FRED WILL5000/GDP)
+    set('in_valuation_cape',    d.cape);    // 🧭 진자 밸류에이션 (함수에서 제공 시)
+    recalc();                               // → renderPendulum() 연쇄 호출
     const extra = (d.fedFunds !== null && d.fedFunds !== undefined) ? ` 참고: 연준 기준금리 ${d.fedFunds}%.` : '';
-    st.textContent = `✓ ${d.asOf || '최신'} 기준 5개 지표 자동 입력 완료.${extra} 나머지 신호(02 시장폭 · 04 연준국면 · 05 밸류 · 06 LEI · 07 모멘텀)는 링크로 확인 후 입력하세요.`;
+    const bufNote = (d.buffett !== null && d.buffett !== undefined) ? ` 버핏지수 ${d.buffett}%도 진자에 반영.` : '';
+    st.textContent = `✓ ${d.asOf || '최신'} 기준 지표 자동 입력 완료.${extra}${bufNote} 나머지 신호(02 시장폭 · 04 연준국면 · 05 밸류 · 06 LEI · 07 모멘텀)는 링크로 확인 후 입력하세요.`;
     toast('최신 데이터를 가져왔습니다 ✓');
   }catch(e){
     st.textContent = '조회 실패: ' + e.message + ' — Netlify 배포 주소(xxx.netlify.app)에서 열었는지, Netlify에 FRED_API_KEY 환경변수를 등록했는지 확인하세요.';
@@ -551,10 +764,16 @@ async function saveCheck(){
   if(g+y+r===0){ toast('최소 1개 이상 신호를 입력해 주세요'); return; }
   data._results = judgeAll(data); // 판정 스냅샷도 함께 저장
 
+  // 🧭 진자 스냅샷 (기존 입력에서 재계산)
+  const pget = id => { const el = document.getElementById(id); return el ? num(el.value) : null; };
+  const { pos:pendPos, dims:pendDims } = computePendulum(pget);
+  const pendPosture = pendPos===null ? null : postureOf(pendPos).name;
+
   const {error} = await sb.from('bear_market_checks').insert({
     check_date: $('checkDate').value || new Date().toISOString().slice(0,10),
     data, red_count:r, yellow_count:y, green_count:g,
     grade, memo: $('checkMemo').value || null,
+    pendulum_pos: pendPos, pendulum_posture: pendPosture, pendulum_dims: pendDims,
   });
   if(error){ toast('저장 실패: ' + error.message); return; }
   toast('점검 기록이 저장되었습니다 ✓');
@@ -566,20 +785,26 @@ async function loadHistory(){
   if(!sb) return;
   const {data:rows, error} = await sb.from('bear_market_checks')
     .select('*').order('check_date',{ascending:false}).limit(36);
-  if(error){ $('historyBody').innerHTML = `<tr><td colspan="7" class="empty">불러오기 실패: ${error.message}</td></tr>`; return; }
+  if(error){ $('historyBody').innerHTML = `<tr><td colspan="8" class="empty">불러오기 실패: ${error.message}</td></tr>`; return; }
   if(!rows || rows.length===0){
-    $('historyBody').innerHTML = `<tr><td colspan="7" class="empty">저장된 점검 기록이 없습니다.</td></tr>`; return;
+    $('historyBody').innerHTML = `<tr><td colspan="8" class="empty">저장된 점검 기록이 없습니다.</td></tr>`; return;
   }
   const gradeColor = {'정상 보유':'var(--green)','현금 비중 점진 확대':'var(--amber)','방어 모드':'var(--red)'};
+  const postureColor = {'강한 공격':'var(--struct)','점진 공격':'var(--struct)','균형':'var(--ink)','점진 수비':'var(--amber)','강한 수비':'var(--red)'};
   $('historyBody').innerHTML = rows.map(row=>{
     const res = (row.data && row.data._results) || [];
     const dots = SIGNALS.map((s,i)=>`<span class="dot ${res[i]||''}" title="${s.no} ${s.short}"></span>`).join('');
+    const pPos = (row.pendulum_pos===null || row.pendulum_pos===undefined) ? null : row.pendulum_pos;
+    const pCell = pPos===null ? '<span style="color:var(--muted);">—</span>'
+      : `<span style="font-family:var(--mono); font-weight:600; color:${postureColor[row.pendulum_posture]||'var(--ink)'}">${pPos}</span>`
+        + `<span style="font-size:11.5px; color:var(--muted);"> · ${row.pendulum_posture||''}</span>`;
     return `<tr>
       <td style="font-family:var(--mono); white-space:nowrap;">${row.check_date}</td>
       <td><div class="dots">${dots}</div></td>
       <td style="font-family:var(--mono); color:var(--red);">${row.red_count}</td>
       <td style="font-family:var(--mono); color:var(--amber);">${row.yellow_count}</td>
       <td><span class="grade-chip" style="color:${gradeColor[row.grade]||'var(--ink)'}">${row.grade||'—'}</span></td>
+      <td style="white-space:nowrap;">${pCell}</td>
       <td style="color:var(--muted); max-width:220px;">${row.memo?escapeHtml(row.memo):''}</td>
       <td><button class="btn danger" onclick="deleteCheck('${row.id}')">삭제</button></td>
     </tr>`;
@@ -600,6 +825,7 @@ function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;'
    ⑤ 초기화
    ══════════════════════════════════════════════ */
 buildUI();
+showView('compass');
 const now = new Date();
 $('checkDate').value = now.toISOString().slice(0,10);
 $('todayLabel').textContent = now.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
