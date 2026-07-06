@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>베어마켓 조기경보 대시보드 v1.3</title>
+<title>베어마켓 조기경보 대시보드 v1.4</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -124,6 +124,15 @@
   .pend-posture.atk2,.pend-posture.atk1{color:var(--struct);}
   .pend-posture.neu{color:var(--ink);}
   .pend-posture.def1{color:var(--amber);} .pend-posture.def2{color:var(--red);}
+  /* 진자 도식 + 이동 방향 */
+  .pend-diagram-wrap{margin:22px 0 6px; text-align:center;}
+  .pend-diagram-wrap svg{max-width:360px; width:100%; height:auto;}
+  .pend-dir{font-size:13px; color:var(--muted); margin-top:4px; line-height:1.5;}
+  .pend-dir b{color:var(--ink);}
+  .pend-dir .up{color:var(--red); font-weight:600;} .pend-dir .down{color:var(--struct); font-weight:600;} .pend-dir .flat{color:var(--muted);}
+  .pend-dims-legend{font-size:11.5px; color:var(--muted); margin:18px 0 10px; line-height:1.55;}
+  .pend-dims-legend b{color:var(--ink); font-weight:600;}
+  .pdim .pd-desc{font-size:10.8px; color:var(--muted); margin-top:8px; line-height:1.45; word-break:keep-all;}
   @media (max-width:600px){ .pend-dims{grid-template-columns:repeat(2,1fr);} }
 
   /* ── 섹션 타이틀 ──────────────────── */
@@ -228,7 +237,7 @@
   <div class="wrap header-row">
     <div>
       <div class="eyebrow">BEAR MARKET EARLY WARNING SYSTEM</div>
-      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.3</span></h1>
+      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.4</span></h1>
       <div class="header-sub">7개 신호 월 1회 점검 · 조정장은 매수 기회, 베어마켓만 경계한다 · 🧭 막스 진자 추가</div>
     </div>
     <div class="today" id="todayLabel"></div>
@@ -261,6 +270,11 @@
       <div class="pend-scale">
         <span>극공포·헐값</span><span>비관</span><span>중립</span><span>낙관</span><span>극탐욕·거품</span>
       </div>
+      <div class="pend-diagram-wrap">
+        <div id="pendDiagram"></div>
+        <div class="pend-dir" id="pendDir"></div>
+      </div>
+      <div class="pend-dims-legend">아래 4개 차원의 점수는 <b>0 = 공포·헐값(공격 기회)</b> → <b>100 = 탐욕·거품(수비)</b> 방향으로 통일돼 있고, 이들의 가중평균이 위 진자 위치입니다.</div>
       <div class="pend-dims" id="pendDims"></div>
       <div class="verdict" style="margin-top:20px;">
         <div class="verdict-grade pend-posture" id="pendPosture">—</div>
@@ -671,30 +685,117 @@ function recalc(){
 /* ══════════════════════════════════════════════
    ③-0 막스 진자 렌더 (recalc() 끝에서 호출)
    ══════════════════════════════════════════════ */
+// 4차원 의미 설명 (0=공포·헐값 → 100=탐욕·거품 방향으로 통일)
+const DIM_INFO = {
+  sentiment: { name:'심리',        desc:'F&G · VIX · AAII 종합. ↑ 탐욕·과열(경계) / ↓ 공포(역발상 기회).' },
+  credit:    { name:'신용·유동성', desc:'하이일드 스프레드. ↑ 스프레드 좁음=신용 느슨·낙관(후기) / ↓ 스프레드 확대=신용 경색(위험).' },
+  trend:     { name:'추세',        desc:'200일선 위 비율 + 금리차. ↑ 상승추세 성숙(후기 국면) / ↓ 추세 약화·둔화.' },
+  valuation: { name:'밸류에이션',  desc:'Shiller CAPE · 버핏지수. ↑ 고평가(거품 영역) / ↓ 저평가(헐값).' },
+};
+
+let lastPendulum = null; // 최근 저장된 진자 스냅샷 {pos,date} — 이동 방향 비교 기준
+
+// 진자 위치(0~100)를 반원 게이지 좌표로: 중립=50이 바닥, 양극단이 위로 스윙
+function pendPoint(pos, r){
+  const th = ((pos - 50) / 50) * 80 * Math.PI / 180; // ±80°
+  return [170 + r * Math.sin(th), 46 + r * Math.cos(th)];
+}
+
 function renderPendulum(){
   // null-safe: in_valuation_cape/buffett 등 아직 없는 필드는 null 처리
   const get = id => { const el = document.getElementById(id); return el ? num(el.value) : null; };
   const { pos, dims } = computePendulum(get);
-  const mark = $('pendMark'), pin = $('pendPin');
-  const NAMES = { sentiment:'심리', credit:'신용·유동성', trend:'추세', valuation:'밸류에이션' };
-  $('pendDims').innerHTML = Object.keys(NAMES).map(k => {
+  const zone = pos === null ? null : postureOf(pos);
+
+  // ── 4차원 게이지 + 설명 ──
+  $('pendDims').innerHTML = Object.keys(DIM_INFO).map(k => {
     const v = dims[k];
-    return `<div class="pdim"><div class="pd-name">${NAMES[k]}</div>
+    return `<div class="pdim"><div class="pd-name">${DIM_INFO[k].name}</div>
       <div class="pd-val">${v === null ? '—' : Math.round(v)}</div>
-      <div class="pd-bar"><div class="pd-fill" style="width:${v === null ? 0 : Math.round(v)}%"></div></div></div>`;
+      <div class="pd-bar"><div class="pd-fill" style="width:${v === null ? 0 : Math.round(v)}%"></div></div>
+      <div class="pd-desc">${DIM_INFO[k].desc}</div></div>`;
   }).join('');
+
+  // ── 밴드 마커 + 핀 ──
+  const mark = $('pendMark'), pin = $('pendPin');
+  mark.style.left = (pos === null ? 50 : pos) + '%';
+  pin.style.left  = (pos === null ? 50 : pos) + '%';
+  pin.textContent = pos === null ? '— · —' : (pos + ' · ' + zone.name);
+
+  // ── 자세 권고 ──
   if (pos === null){
-    pin.textContent = '— · —'; mark.style.left = '50%'; pin.style.left = '50%';
     $('pendPosture').textContent = '—'; $('pendPosture').className = 'verdict-grade pend-posture';
     $('pendPostureNote').textContent = '지표를 입력하면 진자 위치가 계산됩니다.';
-    return;
+  } else {
+    $('pendPosture').textContent = zone.name;
+    $('pendPosture').className = 'verdict-grade pend-posture ' + zone.cls;
+    $('pendPostureNote').textContent = zone.note;
   }
-  const zone = postureOf(pos);
-  mark.style.left = pos + '%'; pin.style.left = pos + '%';
-  pin.textContent = pos + ' · ' + zone.name;
-  $('pendPosture').textContent = zone.name;
-  $('pendPosture').className = 'verdict-grade pend-posture ' + zone.cls;
-  $('pendPostureNote').textContent = zone.note;
+
+  // ── 이동 방향(직전 저장 대비) ──
+  let dirText = '', dirColor = '#6B7C93';
+  if (pos === null){
+    dirText = '';
+  } else if (!lastPendulum){
+    dirText = '<span class="flat">비교할 이전 저장 기록이 없습니다 — 이번 점검을 저장하면 다음부터 진자의 이동 방향(↑탐욕 / ↓공포)이 표시됩니다.</span>';
+  } else {
+    const d = pos - lastPendulum.pos;
+    if (Math.abs(d) <= 1){
+      dirText = `<span class="flat">이전 저장(${lastPendulum.date}) ${lastPendulum.pos} → 현재 <b>${pos}</b> · 거의 변화 없음</span>`;
+    } else if (d > 0){
+      dirColor = '#E5484D';
+      dirText = `이전 저장(${lastPendulum.date}) ${lastPendulum.pos} → 현재 <b>${pos}</b> · <span class="up">▲ 탐욕·거품 쪽으로 ${d}p 상승 (과열↑ 방향)</span>`;
+    } else {
+      dirColor = '#7DD3FC';
+      dirText = `이전 저장(${lastPendulum.date}) ${lastPendulum.pos} → 현재 <b>${pos}</b> · <span class="down">▼ 공포·헐값 쪽으로 ${-d}p 하락 (극탐욕에서 내려오는 방향)</span>`;
+    }
+  }
+  $('pendDir').innerHTML = dirText;
+  renderPendulumDiagram(pos, zone, dirColor);
+}
+
+// 반원 진자 도식(SVG): 트랙(발산 스케일) + 팔·추 + 직전 위치 잔상·이동 화살표
+function renderPendulumDiagram(pos, zone, dirColor){
+  const ARC = 120, ARM = 120;
+  const zoneColor = { atk2:'#1E5C6E', atk1:'#2E6E7E', neu:'#3A4658', def1:'#8A5A2E', def2:'#8E3438' };
+  let pts = '';
+  for (let p = 0; p <= 100; p += 2){ const [x,y] = pendPoint(p, ARC); pts += `${x.toFixed(1)},${y.toFixed(1)} `; }
+
+  let dyn = '';
+  if (pos === null){
+    dyn = `<line x1="170" y1="46" x2="170" y2="166" stroke="#3A4658" stroke-width="3"/>
+      <circle cx="170" cy="166" r="15" fill="#22304A" stroke="#3A4658" stroke-width="2"/>
+      <text x="170" y="171" text-anchor="middle" font-size="13" fill="#8A99AD">—</text>`;
+  } else {
+    const [bx,by] = pendPoint(pos, ARM);
+    let ghost = '';
+    if (lastPendulum && lastPendulum.pos !== pos){
+      const [gx,gy] = pendPoint(lastPendulum.pos, ARM);
+      ghost = `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="8" fill="none" stroke="#6B7C93" stroke-width="2" stroke-dasharray="3 3"/>
+        <path d="M ${gx.toFixed(1)} ${gy.toFixed(1)} L ${bx.toFixed(1)} ${by.toFixed(1)}" stroke="${dirColor}" stroke-width="2.5" fill="none" marker-end="url(#pendArrow)"/>`;
+    }
+    dyn = `${ghost}
+      <line x1="170" y1="46" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" stroke="#E8EDF4" stroke-width="3"/>
+      <circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="16" fill="${zoneColor[zone.cls]}" stroke="#E8EDF4" stroke-width="2"/>
+      <text x="${bx.toFixed(1)}" y="${(by+5).toFixed(1)}" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">${pos}</text>`;
+  }
+
+  $('pendDiagram').innerHTML = `<svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="진자 위치 도식">
+    <defs>
+      <linearGradient id="pendGrad" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" stop-color="#1E5C6E"/><stop offset=".25" stop-color="#2E6E7E"/>
+        <stop offset=".5" stop-color="#3A4658"/><stop offset=".75" stop-color="#8A5A2E"/>
+        <stop offset="1" stop-color="#8E3438"/></linearGradient>
+      <marker id="pendArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" fill="${dirColor}"/></marker>
+    </defs>
+    <polyline points="${pts.trim()}" fill="none" stroke="url(#pendGrad)" stroke-width="9" stroke-linecap="round" opacity=".9"/>
+    <circle cx="170" cy="46" r="5.5" fill="#E8EDF4"/>
+    ${dyn}
+    <text x="48" y="56" text-anchor="middle" font-size="10.5" fill="#8A99AD">극공포·헐값</text>
+    <text x="170" y="192" text-anchor="middle" font-size="10.5" fill="#8A99AD">중립</text>
+    <text x="292" y="56" text-anchor="middle" font-size="10.5" fill="#8A99AD">극탐욕·거품</text>
+  </svg>`;
 }
 
 /* ══════════════════════════════════════════════
@@ -771,6 +872,10 @@ async function loadHistory(){
   if(!rows || rows.length===0){
     $('historyBody').innerHTML = `<tr><td colspan="8" class="empty">저장된 점검 기록이 없습니다.</td></tr>`; return;
   }
+  // 최근 저장된 진자 위치를 이동 방향 비교 기준으로 (진자 값이 있는 첫 행)
+  const wp = rows.find(r => r.pendulum_pos !== null && r.pendulum_pos !== undefined);
+  lastPendulum = wp ? { pos: wp.pendulum_pos, date: wp.check_date } : null;
+  renderPendulum();
   const gradeColor = {'정상 보유':'var(--green)','현금 비중 점진 확대':'var(--amber)','방어 모드':'var(--red)'};
   const postureColor = {'강한 공격':'var(--struct)','점진 공격':'var(--struct)','균형':'var(--ink)','점진 수비':'var(--amber)','강한 수비':'var(--red)'};
   $('historyBody').innerHTML = rows.map(row=>{
