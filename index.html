@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>베어마켓 조기경보 대시보드 v1.7</title>
+<title>베어마켓 조기경보 대시보드 v1.8</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -130,6 +130,21 @@
   .pend-dir{font-size:13px; color:var(--muted); margin-top:4px; line-height:1.5;}
   .pend-dir b{color:var(--ink);}
   .pend-dir .up{color:var(--red); font-weight:600;} .pend-dir .down{color:var(--struct); font-weight:600;} .pend-dir .flat{color:var(--muted);}
+  /* 통합 해석 (두 렌즈 결합) + AI 심층 해석 (v1.8) */
+  .integrated{margin-top:20px; background:rgba(125,211,252,.06); border:1px solid rgba(125,211,252,.28);
+    border-radius:10px; padding:14px 16px; line-height:1.6;}
+  .integrated .int-title{font-family:var(--mono); font-size:11px; letter-spacing:.16em; color:var(--struct); margin-bottom:6px;}
+  .integrated .int-head{font-size:14.5px; font-weight:700; margin-bottom:4px;}
+  .integrated .int-body{font-size:13px; color:var(--ink);}
+  .integrated .int-body b{color:var(--struct);}
+  .ai-sect{margin-top:14px;}
+  .ai-report{margin-top:12px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px; font-size:13.5px; line-height:1.7; display:none;}
+  .ai-report h4{font-size:14px; color:var(--struct); margin:14px 0 6px;}
+  .ai-report h4:first-child{margin-top:0;}
+  .ai-report b{color:var(--struct);}
+  .ai-report .ai-meta{font-size:11px; color:var(--muted); margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);}
+  .ai-note{font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5;}
   .pend-dims-legend{font-size:11.5px; color:var(--muted); margin:18px 0 10px; line-height:1.55;}
   .pend-dims-legend b{color:var(--ink); font-weight:600;}
   .pdim .pd-desc{font-size:10.8px; color:var(--muted); margin-top:8px; line-height:1.45; word-break:keep-all;}
@@ -246,7 +261,7 @@
   <div class="wrap header-row">
     <div>
       <div class="eyebrow">BEAR MARKET EARLY WARNING SYSTEM</div>
-      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.7</span></h1>
+      <h1>베어마켓 조기경보 대시보드 <span class="ver">v1.8</span></h1>
       <div class="header-sub">7개 신호 월 1회 점검 · 조정장은 매수 기회, 베어마켓만 경계한다 · 🧭 막스 진자 추가</div>
     </div>
     <div class="today" id="todayLabel"></div>
@@ -289,6 +304,21 @@
         <div class="verdict-grade pend-posture" id="pendPosture">—</div>
         <div class="verdict-note" id="pendPostureNote">지표를 입력하면 진자 위치가 계산됩니다.</div>
       </div>
+
+      <!-- 통합 해석: 조기경보(펀더멘탈) × 진자(가격·심리) 두 렌즈 결합 (v1.8) -->
+      <div class="integrated" id="integratedBox" style="display:none;">
+        <div class="int-title">TWO-LENS READING — 통합 해석</div>
+        <div class="int-head" id="intHead"></div>
+        <div class="int-body" id="intBody"></div>
+      </div>
+
+      <!-- AI 심층 해석 (v1.8) -->
+      <div class="ai-sect">
+        <button class="btn" id="aiBtn" onclick="aiInterpret()">🤖 AI 심층 해석</button>
+        <div class="ai-note">현재 입력된 모든 지표를 AI(Claude)가 읽고 초보자 눈높이로 해석해 줍니다. 배포 주소에서만 작동하며, 호출당 소액의 API 비용(약 $0.05 내외)이 발생합니다. 해석은 교육·참고용이며 투자 자문이 아닙니다.</div>
+        <div class="ai-report" id="aiReport"></div>
+      </div>
+
       <div class="banner" style="background:rgba(125,211,252,.06); border-color:rgba(125,211,252,.28); color:var(--struct); margin-top:20px;">
         🧭 진자는 <b>🚨 조기경보</b> 탭의 입력값을 그대로 읽어 계산됩니다. 값을 채운 뒤 이 탭에서 공수 자세를 확인하세요. (예측이 아니라 온도계 — 단정적 매매 지시가 아닌 자세 권고)
       </div>
@@ -557,8 +587,10 @@ const NORM = {
   aaii: v => lerp(v, 20, 55),         // 강세론자 많을수록 탐욕
   hy:   v => lerp(8 - v, 0, 5.5),     // 스프레드 좁을수록 탐욕: 2.5%→100, 8%→0
   breadth: v => v,                    // 200일선 위 % 높을수록 후기/탐욕
-  cape: v => lerp(v, 15, 40),         // 앵커 15~40 (초기 고정, 후에 과거 백분위로 교체)
-  buffett: v => lerp(v, 80, 200),     // 시총/GDP %: 80→0, 200→100
+  // v1.8 앵커 상향: 기존 상한(40/200)을 현재값(42/238)이 뚫어 100에 포화 → 극단 안 변별력 상실.
+  // 상한을 역사적 최고권(닷컴 44, 2026년 238+) 근처로 넓혀 "극단 안에서의 움직임"도 보이게 함.
+  cape: v => lerp(v, 15, 45),         // 앵커 15~45 (후에 과거 백분위로 교체)
+  buffett: v => lerp(v, 80, 260),     // 시총/GDP %: 80→0, 260→100
 };
 
 function computePendulum(get) {              // get(id) → number|null
@@ -697,6 +729,7 @@ function recalc(){
     $('gradeLabel').textContent='—'; $('gradeLabel').className='verdict-grade safe';
     $('gradeNote').textContent='지표를 입력하면 종합 판정이 표시됩니다.';
     renderPendulum();
+    renderIntegrated(null);
     return {g,y,r,grade:null};
   }
   // 주의 2개 = 위험 1개로 환산하여 보수적으로 반영
@@ -707,6 +740,7 @@ function recalc(){
   $('gradeLabel').className = 'verdict-grade ' + grade.cls;
   $('gradeNote').innerHTML = grade.note + (entered<7 ? ` <em style="color:var(--muted)">(입력 ${entered}/7 — 전체 입력 시 판정이 더 정확해집니다)</em>` : '');
   renderPendulum();
+  renderIntegrated(grade.cls);
   return {g,y,r,grade:grade.name};
 }
 
@@ -824,6 +858,92 @@ function renderPendulumDiagram(pos, zone, dirColor){
     <text x="170" y="192" text-anchor="middle" font-size="10.5" fill="#8A99AD">중립</text>
     <text x="292" y="56" text-anchor="middle" font-size="10.5" fill="#8A99AD">극탐욕·거품</text>
   </svg>`;
+}
+
+/* ══════════════════════════════════════════════
+   ③-0-1 통합 해석 — 조기경보(펀더멘탈) × 진자(가격·심리) (v1.8)
+   두 판정이 달라 보일 때 그 조합이 뜻하는 바를 한 문장으로 번역.
+   ══════════════════════════════════════════════ */
+const INTEGRATED = {
+  'safe|atk':    { head:'🟢 + 🔵 매수 기회 구간', body:'펀더멘탈 훼손 신호가 없는데 가격·심리는 공포/저평가 쪽입니다. 막스가 말하는 <b>"위험이 쌀 때"</b> — 지금의 하락은 조정(기회)일 가능성이 높아, 분할 매수를 검토할 만한 조합입니다.' },
+  'safe|neu':    { head:'🟢 + ⚪ 정상 항해', body:'하방 위험도, 과열도 뚜렷하지 않습니다. 기존 계획(적립·보유)을 그대로 유지하면 되는 가장 평온한 조합입니다.' },
+  'safe|def':    { head:'🟢 + 🟠 보유하되, 더 사지는 않는다', body:'팔 이유(펀더멘탈 훼손)는 없지만 더 살 이유(싼 가격)도 없습니다. <b>보유 유지 + 신규 매수 절제 + 현금 점진 확보</b>가 어울립니다. 이 구간에서 하락이 오면 조정=기회일 가능성이 높습니다. (2021년 중반과 유사한 구도 — 진자가 먼저 경고하고, 조기경보는 실제 훼손 때 뒤따라 울립니다.)' },
+  'watch|atk':   { head:'🟡 + 🔵 드문 조합 — 신중한 분할 접근', body:'위험 신호가 늘어나는데 심리는 이미 공포 쪽입니다. 급락 초입에 흔한 구도로, 역발상 매수는 <b>소액 분할</b>로만, 신호 07(모멘텀)과 신용 스프레드 추이를 특히 주시하세요.' },
+  'watch|neu':   { head:'🟡 + ⚪ 경계 항해', body:'복수의 주의 신호가 켜졌습니다. 신규 매수를 늦추고 과열 종목 위주로 이익 실현을 검토하되, 진자가 중립이므로 급하게 움직일 이유는 없습니다.' },
+  'watch|def':   { head:'🟡 + 🟠 위험 누적 — 가장 경계할 조합', body:'펀더멘탈 경고가 시작됐는데 가격은 여전히 비쌉니다. 베어마켓 전조에서 자주 보이는 구도 — <b>현금 비중 확대와 레버리지 축소</b>를 우선하세요.' },
+  'defend|atk':  { head:'🔴 + 🔵 베어 속 극공포 — 역발상 준비 구간', body:'펀더멘탈은 훼손됐지만 가격·심리는 이미 바닥권입니다. 막스의 "떨어지는 칼"이자 동시에 최고의 매수 기회가 잉태되는 구간 — <b>서두르지 말고, 회복 신호(신용 스프레드 축소·시장폭 회복) 확인 후 분할 진입</b>을 준비하세요.' },
+  'defend|neu':  { head:'🔴 + ⚪ 방어 유지', body:'펀더멘탈 훼손이 진행 중입니다. 진자가 중립이어도 방어 모드를 유지하고, 진자가 공포 극단으로 갈 때를 매수 준비 신호로 삼으세요.' },
+  'defend|def':  { head:'🔴 + 🟠 즉시 방어', body:'펀더멘탈 훼손 + 가격 과열이 겹친 가장 위험한 조합입니다. 현금·방어 자산 비중을 크게 높이고 반등을 이탈 기회로 쓰세요.' },
+};
+
+function renderIntegrated(gradeCls){
+  const box = $('integratedBox'); if(!box) return;
+  const get = id => { const el = document.getElementById(id); return el ? num(el.value) : null; };
+  const { pos } = computePendulum(get);
+  if(gradeCls === null || pos === null){
+    if(gradeCls === null && pos === null){ box.style.display = 'none'; return; }
+    box.style.display = '';
+    $('intHead').textContent = '한쪽 렌즈의 데이터가 부족합니다';
+    $('intBody').innerHTML = gradeCls === null
+      ? '진자는 계산됐지만 7신호 입력이 없습니다. 🚨 조기경보 탭에서 신호를 입력하면 두 렌즈를 결합해 해석해 드립니다.'
+      : '7신호는 판정됐지만 진자 계산에 필요한 입력이 없습니다.';
+    return;
+  }
+  const pGroup = pos <= 40 ? 'atk' : pos <= 60 ? 'neu' : 'def';
+  // GRADES cls: safe/watch/defend (reduce는 미사용)
+  const key = (gradeCls === 'safe' ? 'safe' : gradeCls === 'defend' ? 'defend' : 'watch') + '|' + pGroup;
+  const t = INTEGRATED[key];
+  box.style.display = '';
+  $('intHead').textContent = t.head;
+  $('intBody').innerHTML = t.body;
+}
+
+/* ══════════════════════════════════════════════
+   ③-0-2 AI 심층 해석 (v1.8) — /api/interpret (Claude API 경유)
+   ══════════════════════════════════════════════ */
+function mdLite(s){
+  // AI 응답의 가벼운 마크다운만 렌더 (이스케이프 후 최소 변환)
+  let h = escapeHtml(s);
+  h = h.replace(/^#{2,4}\s*(.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+  h = h.replace(/^[-•]\s+(.+)$/gm, '&nbsp;&nbsp;• $1');
+  h = h.replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>');
+  return h;
+}
+
+async function aiInterpret(){
+  const btn = $('aiBtn'), rep = $('aiReport');
+  btn.disabled = true; btn.textContent = '해석 중… (30초~1분)';
+  rep.style.display = ''; rep.innerHTML = '<span style="color:var(--muted)">지표를 모아 AI에게 보내는 중입니다…</span>';
+  try{
+    const data = readInputs();
+    const results = judgeAll(data);
+    const rc = recalc();
+    const get = id => { const el = document.getElementById(id); return el ? num(el.value) : null; };
+    const { pos, dims } = computePendulum(get);
+    const payload = {
+      date: new Date().toISOString().slice(0,10),
+      inputs: data,
+      signalResults: SIGNALS.map((s,i)=>({ no:s.no, name:s.name, result: results[i] })),
+      counts: { g: rc.g, y: rc.y, r: rc.r },
+      grade: rc.grade,
+      pendulum: { pos, posture: pos===null ? null : postureOf(pos).name, dims },
+      lastPendulum,
+    };
+    const res = await fetch('/api/interpret', {
+      method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload),
+    });
+    const j = await res.json().catch(()=>({}));
+    if(!res.ok || j.error) throw new Error(j.error || ('서버 응답 오류 ' + res.status));
+    rep.innerHTML = mdLite(j.text)
+      + '<div class="ai-meta">🤖 Claude 생성 · 교육·참고용이며 투자 자문이 아닙니다 · 최종 판단은 본인의 몫입니다</div>';
+    toast('AI 해석 완료 ✓');
+  }catch(e){
+    rep.innerHTML = '<span style="color:var(--red)">해석 실패: ' + escapeHtml(e.message) + '</span>'
+      + '<div class="ai-meta">배포 주소(pages.dev)에서 열었는지, Cloudflare에 ANTHROPIC_API_KEY 환경변수를 등록했는지 확인하세요. (로컬에서는 함수가 없어 실패가 정상)</div>';
+    toast('AI 해석 실패');
+  }
+  btn.disabled = false; btn.textContent = '🤖 AI 심층 해석';
 }
 
 /* ══════════════════════════════════════════════
